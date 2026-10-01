@@ -2,7 +2,7 @@
 #include<cstring>
 
 class DynamicString{
-    char* str;
+    char* str; //pointer to dynamic string in stack
     public:
         // default constructor
         DynamicString(){
