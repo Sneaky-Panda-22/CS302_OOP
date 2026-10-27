@@ -1,4 +1,6 @@
 #include<iostream>
+#include<string>
+
 class NumpyArray {
 private:
     double* data;
@@ -31,6 +33,24 @@ public:
     friend NumpyArray operator*(const NumpyArray&,const double);
     // matrix multiplication
     friend NumpyArray operator*(const NumpyArray&,const NumpyArray&);
+    // element wise subtraction: - operator overloading
+    friend NumpyArray operator-(const NumpyArray&,const NumpyArray&);
+    // () overloading for accessing the individual array elements like arr(0,1) returns the element at pos. 0*cols+1
+    double& operator()(int); // 1D array
+    double& operator()(int,int);
+    // print the shape of the numpy array
+    std::string shape();
+    // return the size of the numpy array
+    int size();
+    // return the dimension of the array. 1D / 2D
+    int ndim();
+    // finding sum. if axis is specified, we find sum across that axis. 
+    // else we return the sum of entire numpy array
+    NumpyArray sum(int);
+    double sum();
+    // finding mean along specified axis. if not specified, we find the mean of entire array
+    NumpyArray mean(int);
+    double mean();
 };
 
 NumpyArray::NumpyArray(int size) {
@@ -108,6 +128,7 @@ std::ostream& operator<<(std::ostream& dout,const NumpyArray& obj){
     return dout;// return refernce
 }
 std::istream& operator>>(std::istream& din,const NumpyArray& obj) {
+    std::cout<<"Enter "<<obj.totalSize<<" Elements:\n";
     for(int i=0;i<obj.totalSize;i++)din>>obj.data[i];// take input
     return din; // return refernece
 }
@@ -144,42 +165,83 @@ NumpyArray operator*(const NumpyArray& a,const NumpyArray& b){
     }
     return result;
 }
+NumpyArray operator-(const NumpyArray& a,const NumpyArray& b) {
+    if(a.rows!=b.rows || a.cols!=b.cols){
+        std::cout<<"Shape Error! ("<<a.rows<<", "<<a.cols<<") and ("<<b.rows<<", "<<b.cols<<")\n";
+        return NumpyArray(0,0);// return empty array on failure
+    }
+    NumpyArray res(a.rows,a.cols);
+    for(int i=0;i<a.totalSize;i++)res.data[i] = a.data[i] - b.data[i];
+    return res;
+}
+double& NumpyArray::operator()(int i){
+    return data[i];
+}
+double& NumpyArray::operator()(int i,int j){
+    return data[i*cols+ j];
+}
+std::string NumpyArray::shape(){
+    if(rows == 1) {
+        return "(" + std::to_string(cols) + ",)";
+    }else{
+        return "(" + std::to_string(rows) + ", " + std::to_string(cols) + ")";
+    }
+}
+int NumpyArray::size(){return totalSize;}
+int NumpyArray::ndim(){
+    if(rows == 1) return 1;
+    else return 2;
+}
+double NumpyArray::sum(){ // works for both 1D and 2D arrays
+    double total = 0;
+    for(int i=0;i<totalSize;i++)total+=data[i];
+    return total;
+}
+NumpyArray NumpyArray::sum(int axis){
+    if(axis != 0 && axis != 1){
+        std::cout<<"Invalid axis! \n";
+        return NumpyArray(0,0); // return an empty array if error occoured
+    }
+    if(axis == 0) {
+        NumpyArray res(cols);
+        for(int c=0;c<cols;c++){
+            double total = 0;
+            for(int r=0;r<rows;r++){
+                total += data[r*cols + c];
+            }
+            res(c) = total;
+        }
+        return res;
+    }
+    else{
+        NumpyArray res(rows);
+        for(int r=0;r<rows;r++){
+            double total = 0;
+            for(int c=0;c<cols;c++){
+                total += data[r*cols + c];
+            }
+            res(r) = total;
+        }
+        return res;
+    }
+}
+double NumpyArray::mean(){
+    return sum()/this->totalSize;
+}
+NumpyArray NumpyArray::mean(int axis){
+    if(axis!=0 && axis!=1){
+        std::cout<<"Invalid axis! \n";
+        return NumpyArray(0,0); // return an empty array if error occoured
+    }
+    NumpyArray res = sum(axis);
+    if(axis==0) for(int c=0;c<cols;c++) res(c)/=rows;
+    else for(int r=0;r<rows;r++) res(r)/=cols;
+    return res;
+}
 
 int main(){
-    int r1,r2,c1,c2;
-    std::cout<<"Enter (rows,cols): ";
-    std::cin>>r1>>c1;
-    NumpyArray arr1(r1,c1);
-    std::cout<<"Enter "<<r1*c1<<" Elements: ";
-    for(int i=0;i<r1;i++){
-        for(int j=0;j<c1;j++){
-            double x;std::cin>>x;
-            arr1.setValue(i,j,x);
-        }
-    }
-    arr1.printArray();
-    std::cout<<"\nEnter (rows,cols): ";
-    std::cin>>r2>>c2;
-    NumpyArray arr2(r2,c2);
-    std::cout<<"Enter "<<r2*c2<<" Elements: ";
-    // for(int i=0;i<r2;i++){
-    //     for(int j=0;j<c2;j++){
-    //         double x;std::cin>>x;
-    //         arr2.setValue(i,j,x);
-    //     }
-    // }
-    std::cin >> arr2;
-    arr2.printArray();
-    std::cout<<"\nArray3 = Array1 + Array2\n";
-    NumpyArray arr3 = arr1 + arr2;
-    std::cout << arr3;
-    std::cout << "\nArray3*2\n";
-    arr3 = arr3*2;
-    std::cout<<arr3;
-    std::cout << "\n4*Array3\n";
-    arr3 = 4*arr3;
-    std::cout<<arr3;
-    std::cout << "\nArray1*Array2: \n";
-    NumpyArray res = arr1*arr2;
-    std::cout << res;
+    NumpyArray arr(2,3);
+    std::cin>>arr;
+    NumpyArray sum = arr.sum(1);
+    std::cout<<sum;
 }
