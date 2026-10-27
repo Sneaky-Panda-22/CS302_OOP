@@ -51,6 +51,38 @@ public:
     // finding mean along specified axis. if not specified, we find the mean of entire array
     NumpyArray mean(int);
     double mean();
+    // finding minimun along specified axis. if not specified, we find from entire array
+    NumpyArray min(int);
+    double min();
+    // finding maximum along specified axis. if not specified, we find from entire array
+    NumpyArray max(int);
+    double max();
+    // finding the transpose of an array
+    NumpyArray transpose();
+    // shorthand for writing transpose
+    NumpyArray T();
+    // reshape an array into another shape.
+    NumpyArray reshape(int,int);
+    
+    // these functions are static as they dont need an object to call. they create new arrays
+    // creating an array with all zeros
+    static NumpyArray zeros(int,int);
+    // creating an array with all ones
+    static NumpyArray ones(int,int);
+    // creating identity matrix
+    static NumpyArray eye(int);
+    // generating a sequnece within start and stop range of a given step size
+    static NumpyArray arange(int,int,int);
+
+    // row selection
+    NumpyArray getRow(int);
+    // column selection
+    NumpyArray getColumn(int);
+    // in splicing, the end index is not included!
+    // 1D slicing
+    NumpyArray slice(int,int);
+    // 2D slicing
+    NumpyArray slice(int,int,int,int);
 };
 
 NumpyArray::NumpyArray(int size) {
@@ -238,10 +270,186 @@ NumpyArray NumpyArray::mean(int axis){
     else for(int r=0;r<rows;r++) res(r)/=cols;
     return res;
 }
+NumpyArray NumpyArray::min(int axis) {
+    if(axis!=0 && axis!=1){
+        std::cout<<"Invalid axis! \n";
+        return NumpyArray(0,0); // return an empty array if error occoured
+    }
+    if (axis == 0) {
+        NumpyArray result(cols);
+        for (int c = 0; c < cols; c++) {
+            double smallest = data[c];
+            for (int r = 1; r < rows; r++) {
+                if (data[r * cols + c] < smallest) {
+                    smallest = data[r * cols + c];
+                }
+            }
+            result(c) = smallest;
+        }
+        return result;
+    }
+    NumpyArray result(rows);
+    for (int r = 0; r < rows; r++) {
+        double smallest = data[r * cols];
+        for (int c = 1; c < cols; c++) {
+            if (data[r * cols + c] < smallest) {
+                smallest = data[r * cols + c];
+            }
+        }
+        result(r) = smallest;
+    }
+    return result;
+}
+double NumpyArray::min() {
+    double result = data[0];
+    for (int i = 1; i < totalSize; i++) {
+        if (data[i] < result) {
+            result = data[i];
+        }
+    }
+    return result;
+}
+NumpyArray NumpyArray::max(int axis) {
+    if(axis!=0 && axis!=1){
+        std::cout<<"Invalid axis! \n";
+        return NumpyArray(0,0); // return an empty array if error occoured
+    }
+    if (axis == 0) {
+        NumpyArray result(cols);
+        for (int c = 0; c < cols; c++) {
+            double largest = data[c];
+            for (int r = 1; r < rows; r++) {
+                if (data[r * cols + c] > largest) {
+                    largest = data[r * cols + c];
+                }
+            }
+            result(c) = largest;
+        }
+        return result;
+    }
+    NumpyArray result(rows);
+    for (int r = 0; r < rows; r++) {
+        double largest = data[r * cols];
+        for (int c = 1; c < cols; c++) {
+            if (data[r * cols + c] > largest) {
+                largest = data[r * cols + c];
+            }
+        }
+        result(r) = largest;
+    }
+    return result;
+}
+double NumpyArray::max() {
+    double result = data[0];
+    for (int i = 1; i < totalSize; i++) {
+        if (data[i] > result) {
+            result = data[i];
+        }
+    }
+    return result;
+}
+NumpyArray NumpyArray::transpose() {
+    NumpyArray result(cols, rows);
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            result.data[j * rows + i] = data[i * cols + j];
+        }
+    }
+    return result;
+}
+NumpyArray NumpyArray::T(){return this->transpose();}
 
-int main(){
-    NumpyArray arr(2,3);
-    std::cin>>arr;
-    NumpyArray sum = arr.sum(1);
-    std::cout<<sum;
+NumpyArray NumpyArray::reshape(int newRow,int newCol){
+    NumpyArray newarr(newRow,newCol);
+    for(int i=0;i<this->totalSize;i++) newarr.data[i] = this->data[i];
+    return newarr;
+}
+NumpyArray NumpyArray::zeros(int rows, int cols) {
+    return NumpyArray(rows, cols);
+}
+NumpyArray NumpyArray::ones(int rows, int cols) {
+    NumpyArray result(rows, cols);
+    for (int i = 0; i < result.totalSize; i++) {
+        result.data[i] = 1;
+    }
+    return result;
+}
+NumpyArray NumpyArray::eye(int size) {
+    NumpyArray result(size, size);
+    for (int i = 0; i < size; i++) {
+        result.data[i * size + i] = 1;
+    }
+    return result;
+}
+NumpyArray NumpyArray::arange(int start, int stop, int step=1) {
+    int count = 0;
+    for (int i = start; i < stop; i += step) {
+        count++;
+    }
+    NumpyArray result(count);
+
+    int index = 0;
+    for (int i = start; i < stop; i += step) {
+        result(index++) = i;
+    }
+    return result;
+}
+NumpyArray NumpyArray::getRow(int row) {
+    NumpyArray result(cols);
+
+    for (int j = 0; j < cols; j++) {
+        result(j) = data[row * cols + j];
+    }
+
+    return result;
+}
+NumpyArray NumpyArray::getColumn(int col) {
+    NumpyArray result(rows);
+
+    for (int i = 0; i < rows; i++) {
+        result(i) = data[i * cols + col];
+    }
+
+    return result;
+}
+NumpyArray NumpyArray::slice(int start, int stop) {
+    NumpyArray result(stop - start);
+
+    for (int i = start; i < stop; i++) {
+        result(i - start) = data[i];
+    }
+
+    return result;
+}
+NumpyArray NumpyArray::slice(int rowStart, int rowStop,int colStart, int colStop) {
+    int newRows = rowStop - rowStart;
+    int newCols = colStop - colStart;
+
+    NumpyArray result(newRows, newCols);
+    for (int i = rowStart; i < rowStop; i++) {
+        for (int j = colStart; j < colStop; j++) {
+            result((i - rowStart), (j - colStart)) =
+                data[i * cols + j];
+        }
+    }
+    return result;
+}
+int main() {
+    NumpyArray A(3, 4);
+
+    int value = 1;
+
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 4; j++) {
+            A(i, j) = value++;
+        }
+    }
+
+    std::cout << "Original array:\n" << A;
+
+    NumpyArray part = A.slice(0, 2, 1, 3);
+
+    std::cout << "\nSliced array:\n" << part;
+
+    return 0;
 }
