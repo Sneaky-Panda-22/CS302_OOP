@@ -1,7 +1,23 @@
 #include<iostream>
 #include<string>
+#include<vector>
 
-class NumpyArray {
+// base class
+class DataObject
+{
+public:
+    // Every derived class must define these.
+    virtual void display() = 0;
+    virtual void info() = 0;
+    // Shared functionality for all data objects.
+    void show() {
+        info();
+        display();
+    }
+    // Safe destruction through a base-class pointer.
+    virtual ~DataObject() {}
+};
+class NumpyArray: public DataObject {
 private:
     double* data;
     int rows;
@@ -27,7 +43,7 @@ public:
     // << operator overloading for easier and more intuitive way of printing the numpy array
     friend std::ostream& operator<<(std::ostream&,const NumpyArray&);
     // >> operator overloading for easier input from user
-    friend std::istream& operator>>(std::istream&,const NumpyArray&);
+    friend std::istream& operator>>(std::istream&,NumpyArray&);
     // multiplying the numpy array with a scalar constant
     friend NumpyArray operator*(const double,const NumpyArray&);
     friend NumpyArray operator*(const NumpyArray&,const double);
@@ -83,6 +99,18 @@ public:
     NumpyArray slice(int,int);
     // 2D slicing
     NumpyArray slice(int,int,int,int);
+    // Reverse elements along a specified axis
+    NumpyArray flip(int axis = 0);
+
+
+    // overriding the base class functions for polymorphism
+    void display() override {
+        printArray();
+    }
+    void info() override {
+        std::cout << "Object type: NumpyArray" << '\n';
+        std::cout << "Total elements: " << size() << '\n';
+    }
 };
 
 NumpyArray::NumpyArray(int size) {
@@ -159,7 +187,7 @@ std::ostream& operator<<(std::ostream& dout,const NumpyArray& obj){
     }
     return dout;// return refernce
 }
-std::istream& operator>>(std::istream& din,const NumpyArray& obj) {
+std::istream& operator>>(std::istream& din,NumpyArray& obj) {
     std::cout<<"Enter "<<obj.totalSize<<" Elements:\n";
     for(int i=0;i<obj.totalSize;i++)din>>obj.data[i];// take input
     return din; // return refernece
@@ -434,22 +462,141 @@ NumpyArray NumpyArray::slice(int rowStart, int rowStop,int colStart, int colStop
     }
     return result;
 }
-int main() {
-    NumpyArray A(3, 4);
+NumpyArray NumpyArray::flip(int axis) {
+    NumpyArray result(rows, cols);
 
-    int value = 1;
-
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 4; j++) {
-            A(i, j) = value++;
+    // 1D array: reverse all elements
+    if (rows == 1) {
+        for (int i = 0; i < totalSize; i++) {
+            result.data[i] = data[totalSize - 1 - i];
         }
     }
 
-    std::cout << "Original array:\n" << A;
+    // 2D array: reverse the rows
+    else if (axis == 0) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                result.data[i * cols + j] =
+                    data[(rows - 1 - i) * cols + j];
+            }
+        }
+    }
 
-    NumpyArray part = A.slice(0, 2, 1, 3);
+    // 2D array: reverse the columns
+    else if (axis == 1) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                result.data[i * cols + j] =
+                    data[i * cols + (cols - 1 - j)];
+            }
+        }
+    }
 
-    std::cout << "\nSliced array:\n" << part;
+    else {
+        std::cout << "Error: Invalid axis!" << '\n';
+        return NumpyArray(0, 0);
+    }
 
-    return 0;
+    return result;
+}
+
+class AsciiImage:public DataObject{
+private:
+    int rows;
+    int cols;
+    NumpyArray colorMatrix; // store color ID's (Numerical matrix)
+    std::vector<std::string> symbols; // store the symbol to print (Character matrix)
+    
+    // Convert our colour IDs into ANSI foreground colours.
+        std::string getColor(int colorID) {
+            switch(colorID){
+                case 1: return "\033[38;5;196m"; // Red
+                case 2: return "\033[38;5;21m";  // Blue
+                case 3: return "\033[38;5;46m";  // Green
+                case 4: return "\033[38;5;226m"; // Yellow
+                default: return "\033[0m";       // Reset
+            }
+        }
+
+public:
+    // create a 12 x 40 image for demonstartion...
+    AsciiImage():rows(12),cols(40),colorMatrix(12,40),symbols(12,std::string(40,' ')) {
+        // fill the four quadrants
+        for(int r=0;r<rows;r++){
+            for(int c=0;c<cols;c++){
+                int colorID;
+                char symbol;
+                if(r<rows/2 && c < cols/2){
+                    colorID = 1;
+                    symbol = '@';
+                } else if (r < rows / 2){
+                    colorID = 2;
+                    symbol = '#';
+                } else if (c < cols / 2){
+                    colorID = 3;
+                    symbol = '*';
+                } else {
+                colorID = 4;
+                    symbol = '+';
+                }
+
+                colorMatrix.setValue(r,c,colorID);
+                symbols[r][c] = symbol;
+            }
+        }
+    }
+     // Display the coloured ASCII image.
+    void display() override {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                int colourID = static_cast<int>(colorMatrix(i, j));
+                std::cout << getColor(colourID) << symbols[i][j];
+            }
+            std::cout << "\033[0m" << '\n';
+        }
+        // Ensure subsequent terminal output uses default formatting.
+        std::cout << "\033[0m";
+    }
+    // Display information about this image.
+    void info() override {
+        std::cout << "Object type: AsciiImage" << '\n';
+        std::cout << "Dimensions: " << rows << " x " << cols << '\n';
+        std::cout << "Total cells: " << rows * cols << '\n';
+        std::cout << "Colour system: ANSI 256-colour palette" << '\n';
+    }
+    void flip(int);
+};
+void AsciiImage::flip(int axis){
+    // flip the color matrix along that axis
+    colorMatrix = colorMatrix.flip(axis);
+    // flip the symbols using the same axis
+    if(axis==0){
+        for(int i=0;i<rows/2;i++){
+            std::swap(symbols[i],symbols[rows-i-1]);
+        }
+    }
+    else if(axis==1){
+        for(int i=0;i<rows;i++){
+            for(int j=0;j<cols/2;j++){
+                std::swap(symbols[i][j],symbols[i][cols-j-1]);
+            }
+        }
+    }
+    else{
+        std::cout<<"Invalid axis!\n";
+    }
+}
+int main(){
+    AsciiImage image;
+
+    std::cout << "Original Image" << '\n';
+    image.display();
+
+    std::cout << '\n' << "Vertically Flipped" << '\n';
+    image.flip(0);
+    image.display();
+
+    std::cout << '\n' << "Horizontally Flipped ---" << '\n';
+    image.flip(1);
+    image.display();
 }
