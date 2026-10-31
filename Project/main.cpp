@@ -3,6 +3,7 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <exception>
 
 // base class
 class DataObject
@@ -502,219 +503,120 @@ NumpyArray NumpyArray::flip(int axis) {
     return result;
 }
 
-class AsciiImage:public DataObject{
-private:
-    int rows;
-    int cols;
-    NumpyArray colorMatrix; // store color ID's (Numerical matrix)
-    std::vector<std::string> symbols; // store the symbol to print (Character matrix)
-    
-    // Convert our colour IDs into ANSI foreground colours.
-        // std::string getColor(int colorID) {
-        //     switch(colorID){
-        //         case 1: return "\033[38;5;196m"; // Red
-        //         case 2: return "\033[38;5;21m";  // Blue
-        //         case 3: return "\033[38;5;46m";  // Green
-        //         case 4: return "\033[38;5;226m"; // Yellow
-        //         default: return "\033[0m";       // Reset
-        //     }
-        // }
-
-        // optimised getColor()
-        std::string getColor(int colorID){
-            if(colorID < 0 || colorID > 256) return "\033[0m";
-            return "\033[38;5;" + std::to_string(colorID) + "m";
-        }
-
+class Cplot: public NumpyArray {
 public:
-    // create a 12 x 40 image for demonstartion...
-    AsciiImage():rows(24), cols(60),colorMatrix(24, 60),symbols(24, std::string(60, ' ')) {
-        // fill the four quadrants
-        for(int r=0;r<rows;r++){
-            for(int c=0;c<cols;c++){
-                int colorID;
-                char symbol;
-                if(r<rows/2 && c < cols/2){
-                    colorID = 1;
-                    symbol = '@';
-                } else if (r < rows / 2){
-                    colorID = 2;
-                    symbol = '#';
-                } else if (c < cols / 2){
-                    colorID = 3;
-                    symbol = '*';
-                } else {
-                colorID = 4;
-                    symbol = '+';
-                }
+    // Constructors
+    Cplot(int size);
+    Cplot(int r, int c);
+    Cplot(const NumpyArray& obj);
 
-                colorMatrix.setValue(r,c,colorID);
-                symbols[r][c] = symbol;
-            }
-        }
-    }
-     // Display the coloured ASCII image.
-    void display() override {
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                int colourID = static_cast<int>(colorMatrix(i, j));
-                std::cout << getColor(colourID) << symbols[i][j];
-            }
-            std::cout << "\033[0m" << '\n';
-        }
-        // Ensure subsequent terminal output uses default formatting.
-        std::cout << "\033[0m";
-    }
-    // Display information about this image.
-    void info() override {
-        std::cout << "Object type: AsciiImage" << '\n';
-        std::cout << "Dimensions: " << rows << " x " << cols << '\n';
-        std::cout << "Total cells: " << rows * cols << '\n';
-        std::cout << "Colour system: ANSI 256-colour palette" << '\n';
-    }
-    // flip the image vertically(axis=0) or horizontally(axis=1)
-    void flip(int);
-    // set a pixel at index (i,j) as a character(char) and give a colorID (int) to it.
-    void setPixel(int,int,char,int);
-    // draw saturn 
-    void drawSaturn();
+    // Overridden Functions
+    void info() override;
+    void display() override;
+
+    // Visualization Methods
+    void compare(NumpyArray other);
+    void scatter();
 };
-void AsciiImage::flip(int axis){
-    // flip the color matrix along that axis
-    colorMatrix = colorMatrix.flip(axis);
-    // flip the symbols using the same axis
-    if(axis==0){
-        for(int i=0;i<rows/2;i++){
-            std::swap(symbols[i],symbols[rows-i-1]);
+// Constructors call the base class constructors
+Cplot::Cplot(int size) : NumpyArray(size) {}
+Cplot::Cplot(int r, int c) : NumpyArray(r, c) {}
+Cplot::Cplot(const NumpyArray& obj) : NumpyArray(obj) {}
+
+void Cplot::info() {
+    std::cout << "Object type: Cplot\n";
+    std::cout << "Total data points: " << size() << '\n';
+}
+
+void Cplot::display() {
+    if (ndim() == 1) {
+        std::cout << "\n--- Terminal Histogram ---\n";
+        for (int i = 0; i < size(); i++) {
+            std::cout << "[" << i << "] | ";
+            int val = static_cast<int>((*this)(i)); 
+            for (int j = 0; j < val; j++) std::cout << "█";
+            std::cout << " (" << (*this)(i) << ")\n";
         }
-    }
-    else if(axis==1){
-        for(int i=0;i<rows;i++){
-            for(int j=0;j<cols/2;j++){
-                std::swap(symbols[i][j],symbols[i][cols-j-1]);
-            }
-        }
-    }
-    else{
-        std::cout<<"Invalid axis!\n";
+        std::cout << "--------------------------\n";
+        std::cout << "Max: " << max() << " | Min: " << min() << " | Mean: " << mean() << "\n\n";
+    } else {
+        NumpyArray::printArray(); 
     }
 }
-void AsciiImage::setPixel(int row,int col,char symbol,int colorID){
-    if(row<0 || row >=rows || col<0 || col>=cols){
-        std::cout<<"Invalid pixel position!\n";
+
+void Cplot::compare(NumpyArray other) {
+    NumpyArray diff = *this - other; // Uses the overloaded operator -
+    
+    std::cout << "\n--- Comparative Bar Chart ---\n";
+    for (int i = 0; i < size(); i++) {
+        std::cout << "Idx[" << i << "]\n";
+        
+        // Print Array A
+        std::cout << "  A: ";
+        for (int j = 0; j < static_cast<int>((*this)(i)); j++) std::cout << "█";
+        std::cout << " (" << (*this)(i) << ")\n";
+        
+        // Print Array B
+        std::cout << "  B: ";
+        for (int j = 0; j < static_cast<int>(other(i)); j++) std::cout << "█";
+        std::cout << " (" << other(i) << ")\n";
+        
+        // Print purely numeric Difference
+        std::cout << "  Δ: ";
+        double d = diff(i);
+        if (d == 0) {
+            std::cout << "MATCH\n";
+        } else {
+            // If d is positive, print a '+', otherwise print nothing (since negative numbers already have a '-')
+            std::cout << (d > 0 ? "+" : "") << d << "\n";
+        }
+        std::cout << "\n";
+    }
+}
+
+void Cplot::scatter() {
+    if (ndim() != 2) {
+        std::cout << "Scatter plot requires a 2D array of (X, Y) coordinates.\n";
         return;
     }
-    if(colorID<0 || colorID>255){
-        std::cout<<"ColorId must be between 0 and 255!\n";
-        return;
-    }
-    symbols[row][col] = symbol;
-    colorMatrix.setValue(row,col,colorID);
-}
-void AsciiImage::drawSaturn() {
-    const std::string art = R"SATURN(
-                                                                    ':!~_?]?_>"
-                                                                   `!?)/frxxj\\([
-                                                                  "~1tjft|)1{{)rUYxft1/,
-                                                                 !}/ft|(l/fxuvuj{;,j0vj/l;
-                                                                `~(ff//jcCmpbhhhaaoK_ XCxt|
-                                                              `_\jftrX0qddpwmZZZmmqpqam nLrF~
-                                                            .+\jjrvCmdpwZQLLLCJLQ0ZmpphL`LXr)
-                                                          >(jrxzQqdq0CXnf|))\nYXUQZmqq#[{Ox/
-                                                        :{jrxzQpdmCu!?!,'    ^]YYLZmqoC!0vf'
-                                                       +fnxcLqpmYt?I'        . `nJLZmhq>UYt'
-                                               ',l>~-?_+] /uzXCwpmY/~`         ;zCOZbd-cC\
-                                             ^!+]}{)()}])rcXCZpwCx)_il;'       (CQZkq]cC1
-                                         ,<?}1(|\({{\uXJ0qp0z/}] [1(|{_;       +JQZhO[XU-
-                                      .!-}]1|\/t1)fcULmpwCn({})fvXXzvxf1?l     <UQmaY{Ccl
-                                   .>]}(\/tt\)(xXC0qpZXj|\nCmqwZLYzvnj/({-:    +JQqkx\Qt
-                                  !?{}|//tf\)lnYCZpqCttuQk#*kW00LLJYzuxf\1[>   [L0bm\nC_
-                               "_}1(\/tf\)/uULmpwCufxLhW8MhpmmmZ00LJYcnf\}?>"/Qmby\Un^
-                              l?})|/tt\)/vULmpwJnjzpw%8MobbbpmmmZ0CXvxf/|(1[-iXbwjrJ]
-                             !]})v/t\)/vJLmpmUxfXB8%&W#ahhkbdqwZLXvnxjftt\{1}~]C/Xx^
-                            I?})\ |1\vULmpmUr/vd8%WMM*oahkbbpZCxcvunxrjft/\}{]l/U+
-                           '-[](\{luUCmdmUr\nq&%W##M*oahhbq0JXzccvuunxxjft\}{]>+.
-                           -[] [rYU0pqLnltC*8Moa*MM#*okwLUYXZxxxxzzcvunxxjt\}~<
-                          ^+_tXXLqpQu|lzb&Mah*#MMM*hwQJYXXXzzzzXzzcvvvnrf/({]_i
-                         `)zXYmpOz/)r0*#oho*#***aqQUYXXXXXXXXXXzzzzvxjt/|)[-<"
-                        ;nXv0pmUf{|zw**bkaahkkbqLUYXXXZXXXXXXXXXzXXXcnrjt/l}{]+i
-                       |YrXqqQn1[tjqabaqddpdbqQUXXXZXXXXXXXXXYXcnrjt/l1[--~!
-                     <Xuf0dZY|-}jUmqmOmwwwwwmQYXZzzzzzXXXXXYUXcunxrf/{1}?+il'
-                    tUtcdw0r_~[/vC0LL0OZOZQXCCCCCCzzXXzzXUXcunxrf/l)}?+il:
-                  <Uu/0bOC?`!-)/fvXZYUCLLQJvuuuuvvcczzcXXcnnxrf/l)}?~>l;"
-                 \L/xbq0Xi   <{\jjnvzXXYvnnxnnnuvvvvczvnxrrf/l){?~>!l:'
-                IcU)JhZQv:    ;]1(tjxuvrfjjjrrxnnnnvuxrjft/(){?~>il:`
-               ?Cv1mk0Qv"      !]1(/f/I/ttfjjjjjrxrftt/\(1}?~i!l,'
-              (Qj(bd0Lz;        I_}){|(\\\///tt/\|())[]?+>l:^
-             "fQ/lapZLU+         `;!<~-[1)11)))1{1}][?+~i:'
-            IrQ\)oqZ0Jr`.         :]t/|{<_--___~~~iI;".
-           !xLf]opmZCJ/   .      "<1nLqdqCurx]'
-         !rYXibpwmOJXz_^.   "'I+1jX0qdmJurr/_
-        ;juOlv*qwZOLUXXnt\\txcUQmpdmJnrrf[,
-       trCn"bddqmZ0OLJCLLQOmqdqOXnjjf{l
-      }fx0{^abqpqmmmmmwqbdmJuffjf1!
-     "/tnQr 1hoaaaahkdwQXnt/tjt[l
-     ~|trcQ/,I}trxrf/l{|/ff(_"
-     >\)tfnYYxl)({\tfrfl?I
-      }{C|\l/frrjt([~:
-       ^i+--_<!;`
-)SATURN";
 
-    std::vector<std::string> lines;
-    std::stringstream input(art);
-    std::string line;
-
-    while (std::getline(input, line)) {
-        if (lines.empty() && line.empty()) {
-            continue;
-        }
-
-        lines.push_back(line);
-    }
-
-    rows = static_cast<int>(lines.size());
-    cols = 0;
-
-    for (const std::string& currentLine : lines) {
-        cols = std::max(cols, static_cast<int>(currentLine.size()));
-    }
-
-    colorMatrix = NumpyArray(rows, cols);
-    symbols.assign(rows, std::string(cols, ' '));
-
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < static_cast<int>(lines[i].size()); j++) {
-            char symbol = lines[i][j];
-            int colourID = 250;
-
-            if (symbol == ' ') {
-                colourID = 0;
-            } else if (symbol == '.' || symbol == '`' || symbol == '\'') {
-                colourID = 245;
-            } else if (symbol == '/' || symbol == '\\' ||
-                       symbol == '-' || symbol == '_' ||
-                       symbol == '~' || symbol == '=') {
-                colourID = 179;
-            } else if (symbol == '@' || symbol == '#' ||
-                       symbol == '%' || symbol == '&' ||
-                       symbol == 'M' || symbol == 'W' ||
-                       symbol == '8' || symbol == 'o') {
-                colourID = 220;
-            } else {
-                colourID = 178;
-            }
-
-            setPixel(i, j, symbol, colourID);
+    const int GRID_SIZE = 15;
+    char grid[GRID_SIZE][GRID_SIZE];
+    
+    // Fill the grid with empty spaces
+    for (int r = 0; r < GRID_SIZE; r++) {
+        for (int c = 0; c < GRID_SIZE; c++) {
+            grid[r][c] = ' ';
         }
     }
-}
-int main(){
-    AsciiImage saturn;
 
-    saturn.drawSaturn();
+    // Map coordinates to the grid
+    for (int i = 0; i < size() / 2; i++) {
+        int x = static_cast<int>((*this)(i, 0));
+        int y = static_cast<int>((*this)(i, 1));
+        
+        // Only plot if the point fits inside our 15x15 terminal boundaries
+        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+            // Invert the Y axis so 0 is at the bottom of the terminal, not the top
+            grid[GRID_SIZE - 1 - y][x] = '*'; 
+        }
+    }
 
-    std::cout << "Saturn ASCII Art:" << '\n';
-    saturn.show();
-    return 0;
-
+    // Print the grid and the Y-axis labels
+    std::cout << "\n--- Scatter Plot (15x15 Grid) ---\n";
+    for (int r = 0; r < GRID_SIZE; r++) {
+        int yLabel = GRID_SIZE - 1 - r;
+        if (yLabel < 10) std::cout << " " << yLabel << " | ";
+        else std::cout << yLabel << " | ";
+        
+        for (int c = 0; c < GRID_SIZE; c++) {
+            std::cout << grid[r][c] << " ";
+        }
+        std::cout << "\n";
+    }
+    
+    // Print the X-axis bottom border and labels
+    std::cout << "   +------------------------------\n     ";
+    for (int c = 0; c < GRID_SIZE; c++) std::cout << c % 10 << " ";
+    std::cout << "\n\n";
 }
