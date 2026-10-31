@@ -1,6 +1,8 @@
-#include<iostream>
-#include<string>
-#include<vector>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <algorithm>
 
 // base class
 class DataObject
@@ -508,19 +510,25 @@ private:
     std::vector<std::string> symbols; // store the symbol to print (Character matrix)
     
     // Convert our colour IDs into ANSI foreground colours.
-        std::string getColor(int colorID) {
-            switch(colorID){
-                case 1: return "\033[38;5;196m"; // Red
-                case 2: return "\033[38;5;21m";  // Blue
-                case 3: return "\033[38;5;46m";  // Green
-                case 4: return "\033[38;5;226m"; // Yellow
-                default: return "\033[0m";       // Reset
-            }
+        // std::string getColor(int colorID) {
+        //     switch(colorID){
+        //         case 1: return "\033[38;5;196m"; // Red
+        //         case 2: return "\033[38;5;21m";  // Blue
+        //         case 3: return "\033[38;5;46m";  // Green
+        //         case 4: return "\033[38;5;226m"; // Yellow
+        //         default: return "\033[0m";       // Reset
+        //     }
+        // }
+
+        // optimised getColor()
+        std::string getColor(int colorID){
+            if(colorID < 0 || colorID > 256) return "\033[0m";
+            return "\033[38;5;" + std::to_string(colorID) + "m";
         }
 
 public:
     // create a 12 x 40 image for demonstartion...
-    AsciiImage():rows(12),cols(40),colorMatrix(12,40),symbols(12,std::string(40,' ')) {
+    AsciiImage():rows(24), cols(60),colorMatrix(24, 60),symbols(24, std::string(60, ' ')) {
         // fill the four quadrants
         for(int r=0;r<rows;r++){
             for(int c=0;c<cols;c++){
@@ -564,7 +572,12 @@ public:
         std::cout << "Total cells: " << rows * cols << '\n';
         std::cout << "Colour system: ANSI 256-colour palette" << '\n';
     }
+    // flip the image vertically(axis=0) or horizontally(axis=1)
     void flip(int);
+    // set a pixel at index (i,j) as a character(char) and give a colorID (int) to it.
+    void setPixel(int,int,char,int);
+    // draw saturn 
+    void drawSaturn();
 };
 void AsciiImage::flip(int axis){
     // flip the color matrix along that axis
@@ -586,17 +599,122 @@ void AsciiImage::flip(int axis){
         std::cout<<"Invalid axis!\n";
     }
 }
+void AsciiImage::setPixel(int row,int col,char symbol,int colorID){
+    if(row<0 || row >=rows || col<0 || col>=cols){
+        std::cout<<"Invalid pixel position!\n";
+        return;
+    }
+    if(colorID<0 || colorID>255){
+        std::cout<<"ColorId must be between 0 and 255!\n";
+        return;
+    }
+    symbols[row][col] = symbol;
+    colorMatrix.setValue(row,col,colorID);
+}
+void AsciiImage::drawSaturn() {
+    const std::string art = R"SATURN(
+                                                                    ':!~_?]?_>"
+                                                                   `!?)/frxxj\\([
+                                                                  "~1tjft|)1{{)rUYxft1/,
+                                                                 !}/ft|(l/fxuvuj{;,j0vj/l;
+                                                                `~(ff//jcCmpbhhhaaoK_ XCxt|
+                                                              `_\jftrX0qddpwmZZZmmqpqam nLrF~
+                                                            .+\jjrvCmdpwZQLLLCJLQ0ZmpphL`LXr)
+                                                          >(jrxzQqdq0CXnf|))\nYXUQZmqq#[{Ox/
+                                                        :{jrxzQpdmCu!?!,'    ^]YYLZmqoC!0vf'
+                                                       +fnxcLqpmYt?I'        . `nJLZmhq>UYt'
+                                               ',l>~-?_+] /uzXCwpmY/~`         ;zCOZbd-cC\
+                                             ^!+]}{)()}])rcXCZpwCx)_il;'       (CQZkq]cC1
+                                         ,<?}1(|\({{\uXJ0qp0z/}] [1(|{_;       +JQZhO[XU-
+                                      .!-}]1|\/t1)fcULmpwCn({})fvXXzvxf1?l     <UQmaY{Ccl
+                                   .>]}(\/tt\)(xXC0qpZXj|\nCmqwZLYzvnj/({-:    +JQqkx\Qt
+                                  !?{}|//tf\)lnYCZpqCttuQk#*kW00LLJYzuxf\1[>   [L0bm\nC_
+                               "_}1(\/tf\)/uULmpwCufxLhW8MhpmmmZ00LJYcnf\}?>"/Qmby\Un^
+                              l?})|/tt\)/vULmpwJnjzpw%8MobbbpmmmZ0CXvxf/|(1[-iXbwjrJ]
+                             !]})v/t\)/vJLmpmUxfXB8%&W#ahhkbdqwZLXvnxjftt\{1}~]C/Xx^
+                            I?})\ |1\vULmpmUr/vd8%WMM*oahkbbpZCxcvunxrjft/\}{]l/U+
+                           '-[](\{luUCmdmUr\nq&%W##M*oahhbq0JXzccvuunxxjft\}{]>+.
+                           -[] [rYU0pqLnltC*8Moa*MM#*okwLUYXZxxxxzzcvunxxjt\}~<
+                          ^+_tXXLqpQu|lzb&Mah*#MMM*hwQJYXXXzzzzXzzcvvvnrf/({]_i
+                         `)zXYmpOz/)r0*#oho*#***aqQUYXXXXXXXXXXzzzzvxjt/|)[-<"
+                        ;nXv0pmUf{|zw**bkaahkkbqLUYXXXZXXXXXXXXXzXXXcnrjt/l}{]+i
+                       |YrXqqQn1[tjqabaqddpdbqQUXXXZXXXXXXXXXYXcnrjt/l1[--~!
+                     <Xuf0dZY|-}jUmqmOmwwwwwmQYXZzzzzzXXXXXYUXcunxrf/{1}?+il'
+                    tUtcdw0r_~[/vC0LL0OZOZQXCCCCCCzzXXzzXUXcunxrf/l)}?+il:
+                  <Uu/0bOC?`!-)/fvXZYUCLLQJvuuuuvvcczzcXXcnnxrf/l)}?~>l;"
+                 \L/xbq0Xi   <{\jjnvzXXYvnnxnnnuvvvvczvnxrrf/l){?~>!l:'
+                IcU)JhZQv:    ;]1(tjxuvrfjjjrrxnnnnvuxrjft/(){?~>il:`
+               ?Cv1mk0Qv"      !]1(/f/I/ttfjjjjjrxrftt/\(1}?~i!l,'
+              (Qj(bd0Lz;        I_}){|(\\\///tt/\|())[]?+>l:^
+             "fQ/lapZLU+         `;!<~-[1)11)))1{1}][?+~i:'
+            IrQ\)oqZ0Jr`.         :]t/|{<_--___~~~iI;".
+           !xLf]opmZCJ/   .      "<1nLqdqCurx]'
+         !rYXibpwmOJXz_^.   "'I+1jX0qdmJurr/_
+        ;juOlv*qwZOLUXXnt\\txcUQmpdmJnrrf[,
+       trCn"bddqmZ0OLJCLLQOmqdqOXnjjf{l
+      }fx0{^abqpqmmmmmwqbdmJuffjf1!
+     "/tnQr 1hoaaaahkdwQXnt/tjt[l
+     ~|trcQ/,I}trxrf/l{|/ff(_"
+     >\)tfnYYxl)({\tfrfl?I
+      }{C|\l/frrjt([~:
+       ^i+--_<!;`
+)SATURN";
+
+    std::vector<std::string> lines;
+    std::stringstream input(art);
+    std::string line;
+
+    while (std::getline(input, line)) {
+        if (lines.empty() && line.empty()) {
+            continue;
+        }
+
+        lines.push_back(line);
+    }
+
+    rows = static_cast<int>(lines.size());
+    cols = 0;
+
+    for (const std::string& currentLine : lines) {
+        cols = std::max(cols, static_cast<int>(currentLine.size()));
+    }
+
+    colorMatrix = NumpyArray(rows, cols);
+    symbols.assign(rows, std::string(cols, ' '));
+
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < static_cast<int>(lines[i].size()); j++) {
+            char symbol = lines[i][j];
+            int colourID = 250;
+
+            if (symbol == ' ') {
+                colourID = 0;
+            } else if (symbol == '.' || symbol == '`' || symbol == '\'') {
+                colourID = 245;
+            } else if (symbol == '/' || symbol == '\\' ||
+                       symbol == '-' || symbol == '_' ||
+                       symbol == '~' || symbol == '=') {
+                colourID = 179;
+            } else if (symbol == '@' || symbol == '#' ||
+                       symbol == '%' || symbol == '&' ||
+                       symbol == 'M' || symbol == 'W' ||
+                       symbol == '8' || symbol == 'o') {
+                colourID = 220;
+            } else {
+                colourID = 178;
+            }
+
+            setPixel(i, j, symbol, colourID);
+        }
+    }
+}
 int main(){
-    AsciiImage image;
+    AsciiImage saturn;
 
-    std::cout << "Original Image" << '\n';
-    image.display();
+    saturn.drawSaturn();
 
-    std::cout << '\n' << "Vertically Flipped" << '\n';
-    image.flip(0);
-    image.display();
+    std::cout << "Saturn ASCII Art:" << '\n';
+    saturn.show();
+    return 0;
 
-    std::cout << '\n' << "Horizontally Flipped ---" << '\n';
-    image.flip(1);
-    image.display();
 }
