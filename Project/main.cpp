@@ -1,13 +1,20 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <sstream>
-#include <algorithm>
-#include <exception>
+
+// color palette used for better printing. 
+#define RESET     "\033[0m"
+#define BOLD      "\033[1m"
+#define COLOR_A   "\033[38;5;32m"  // Soft Matplotlib Blue
+#define COLOR_B   "\033[38;5;208m" // Soft Matplotlib Orange
+#define COLOR_POS "\033[38;5;40m"  // Soft Green
+#define COLOR_NEG "\033[38;5;196m" // Soft Red
+#define COLOR_TXT "\033[38;5;240m" // Dark Gray for brackets/text
+#define ARRAY_BLUE "\033[34m" // The crisp blue you liked for the NumpyArray numbers
+
 
 // base class
-class DataObject
-{
+class DataObject {
 public:
     // Every derived class must define these.
     virtual void display() = 0;
@@ -21,7 +28,7 @@ public:
     virtual ~DataObject() {}
 };
 class NumpyArray: public DataObject {
-private:
+protected:
     double* data;
     int rows;
     int cols;
@@ -146,13 +153,17 @@ void NumpyArray::setValue(int r, int c, double val) {
     data[index] = val;
 }
 void NumpyArray::printArray() {
+    std::cout << BOLD << "[\n" << RESET;
     for(int i = 0; i < rows; i++) {
+        std::cout << "  [";
         for(int j = 0; j < cols; j++) {
             int index = (i * cols) + j;
-            std::cout << data[index] << "\t";
+            std::cout << ARRAY_BLUE << data[index] << RESET;
+            if (j < cols - 1) std::cout << ", ";
         }
-        std::cout << "\n";
+        std::cout << "]\n";
     }
+    std::cout << BOLD << "]\n" << RESET;
 }
 NumpyArray& NumpyArray::operator=(const NumpyArray& obj) {
     // Prevent self-assignment (e.g., a = a)
@@ -180,15 +191,19 @@ NumpyArray NumpyArray::operator+(const NumpyArray& obj) {
     }
     return result;// return the resulting array
 }
-std::ostream& operator<<(std::ostream& dout,const NumpyArray& obj){
-    for(int i=0;i<obj.rows;i++){
-        for(int j=0;j<obj.cols;j++){
-            int index = (i*obj.cols)+j;
-            dout << obj.data[index] << "\t";// output the data
+std::ostream& operator<<(std::ostream& dout, const NumpyArray& obj){
+    dout << BOLD << "[\n" << RESET;
+    for(int i = 0; i < obj.rows; i++) {
+        dout << "  [";
+        for(int j = 0; j < obj.cols; j++) {
+            int index = (i * obj.cols) + j;
+            dout << ARRAY_BLUE << obj.data[index] << RESET;
+            if (j < obj.cols - 1) dout << ", ";
         }
-        dout << '\n';
+        dout << "]\n";
     }
-    return dout;// return refernce
+    dout << BOLD << "]\n" << RESET;
+    return dout;
 }
 std::istream& operator>>(std::istream& din,NumpyArray& obj) {
     std::cout<<"Enter "<<obj.totalSize<<" Elements:\n";
@@ -238,10 +253,18 @@ NumpyArray operator-(const NumpyArray& a,const NumpyArray& b) {
     return res;
 }
 double& NumpyArray::operator()(int i){
-    return data[i];
+    if(i < 0 || i >= totalSize){
+        std::cout<<"Error: Index out of bounds\n";
+        return data[0]; // fallback to first element
+    }
+    return data[i];// return the element at the index
 }
 double& NumpyArray::operator()(int i,int j){
-    return data[i*cols+ j];
+    if(i < 0 || i >= rows || j < 0 || j >= cols){
+        std::cout << "Error: indices out of bound\n";
+        return data[0]; // fallback to first element
+    }
+    return data[i*cols+ j];// return the element
 }
 std::string NumpyArray::shape(){
     if(rows == 1) {
@@ -516,7 +539,7 @@ public:
 
     // Visualization Methods
     void compare(NumpyArray other);
-    void scatter();
+    // void heatmap();
 };
 // Constructors call the base class constructors
 Cplot::Cplot(int size) : NumpyArray(size) {}
@@ -530,93 +553,109 @@ void Cplot::info() {
 
 void Cplot::display() {
     if (ndim() == 1) {
-        std::cout << "\n--- Terminal Histogram ---\n";
+        std::cout << BOLD << "\n--- Terminal Histogram ---\n" << RESET;
         for (int i = 0; i < size(); i++) {
-            std::cout << "[" << i << "] | ";
+            std::cout << COLOR_TXT << "[" << i << "] | " << COLOR_A;
             int val = static_cast<int>((*this)(i)); 
             for (int j = 0; j < val; j++) std::cout << "█";
-            std::cout << " (" << (*this)(i) << ")\n";
+            std::cout << RESET << COLOR_TXT << " (" << (*this)(i) << ")\n" << RESET;
         }
-        std::cout << "--------------------------\n";
-        std::cout << "Max: " << max() << " | Min: " << min() << " | Mean: " << mean() << "\n\n";
+        std::cout << COLOR_TXT << "--------------------------\n" << RESET;
+        std::cout << BOLD << "Max: " << COLOR_POS << max() 
+                  << RESET << BOLD << " | Min: " << COLOR_NEG << min() 
+                  << RESET << BOLD << " | Mean: " << COLOR_A << mean() << RESET << "\n\n";
     } else {
         NumpyArray::printArray(); 
     }
 }
 
 void Cplot::compare(NumpyArray other) {
-    NumpyArray diff = *this - other; // Uses the overloaded operator -
+    if(size() != other.size()) {
+        std::cout << COLOR_NEG << "Error: Array must be of same size to compare\n" << RESET;
+        return;
+    }
     
-    std::cout << "\n--- Comparative Bar Chart ---\n";
+    NumpyArray diff = *this - other; 
+    
+    std::cout << BOLD << "\n--- Comparative Bar Chart ---\n" << RESET;
     for (int i = 0; i < size(); i++) {
-        std::cout << "Idx[" << i << "]\n";
+        std::cout << BOLD << COLOR_TXT << "Idx[" << i << "]\n" << RESET;
         
-        // Print Array A
-        std::cout << "  A: ";
+        std::cout << COLOR_TXT << "  A: " << COLOR_A;
         for (int j = 0; j < static_cast<int>((*this)(i)); j++) std::cout << "█";
-        std::cout << " (" << (*this)(i) << ")\n";
+        std::cout << RESET << COLOR_TXT << " (" << (*this)(i) << ")\n" << RESET;
         
-        // Print Array B
-        std::cout << "  B: ";
+        std::cout << COLOR_TXT << "  B: " << COLOR_B;
         for (int j = 0; j < static_cast<int>(other(i)); j++) std::cout << "█";
-        std::cout << " (" << other(i) << ")\n";
+        std::cout << RESET << COLOR_TXT << " (" << other(i) << ")\n" << RESET;
         
-        // Print purely numeric Difference
-        std::cout << "  Δ: ";
+        std::cout << COLOR_TXT << "  Δ: " << RESET;
         double d = diff(i);
         if (d == 0) {
-            std::cout << "MATCH\n";
+            std::cout << COLOR_POS << "MATCH\n" << RESET;
         } else {
-            // If d is positive, print a '+', otherwise print nothing (since negative numbers already have a '-')
-            std::cout << (d > 0 ? "+" : "") << d << "\n";
+            std::cout << (d > 0 ? COLOR_A : COLOR_NEG) << (d > 0 ? "+" : "") << d << RESET << "\n";
         }
         std::cout << "\n";
     }
 }
 
-void Cplot::scatter() {
-    if (ndim() != 2) {
-        std::cout << "Scatter plot requires a 2D array of (X, Y) coordinates.\n";
-        return;
-    }
-
-    const int GRID_SIZE = 15;
-    char grid[GRID_SIZE][GRID_SIZE];
+int main() {
+    // 1. STATIC METHODS & INITIALIZATION
+    std::cout << "\n=== 1. STATIC METHODS & INITIALIZATION ===\n";
+    NumpyArray a = NumpyArray::arange(1, 7, 1); // 1 to 6
+    std::cout << "arange(1, 7):\n" << a;
     
-    // Fill the grid with empty spaces
-    for (int r = 0; r < GRID_SIZE; r++) {
-        for (int c = 0; c < GRID_SIZE; c++) {
-            grid[r][c] = ' ';
-        }
-    }
+    NumpyArray ident = NumpyArray::eye(3);
+    std::cout << "\nIdentity Matrix (3x3):\n" << ident;
 
-    // Map coordinates to the grid
-    for (int i = 0; i < size() / 2; i++) {
-        int x = static_cast<int>((*this)(i, 0));
-        int y = static_cast<int>((*this)(i, 1));
-        
-        // Only plot if the point fits inside our 15x15 terminal boundaries
-        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-            // Invert the Y axis so 0 is at the bottom of the terminal, not the top
-            grid[GRID_SIZE - 1 - y][x] = '*'; 
-        }
-    }
+    // 2. RESHAPING & TRANSPOSE
+    std::cout << "\n=== 2. RESHAPING & TRANSPOSE ===\n";
+    NumpyArray b = a.reshape(2, 3);
+    std::cout << "Reshaped to (2, 3):\n" << b;
+    std::cout << "\nTranspose (3, 2):\n" << b.T();
 
-    // Print the grid and the Y-axis labels
-    std::cout << "\n--- Scatter Plot (15x15 Grid) ---\n";
-    for (int r = 0; r < GRID_SIZE; r++) {
-        int yLabel = GRID_SIZE - 1 - r;
-        if (yLabel < 10) std::cout << " " << yLabel << " | ";
-        else std::cout << yLabel << " | ";
-        
-        for (int c = 0; c < GRID_SIZE; c++) {
-            std::cout << grid[r][c] << " ";
-        }
-        std::cout << "\n";
-    }
+    // 3. MATH & MATRIX OPERATIONS
+    std::cout << "\n=== 3. MATH & MATRIX OPERATIONS ===\n";
+    NumpyArray c = NumpyArray::ones(2, 3) * 2.5; // Scalar multiplication
+    std::cout << "Matrix C (Ones * 2.5):\n" << c;
     
-    // Print the X-axis bottom border and labels
-    std::cout << "   +------------------------------\n     ";
-    for (int c = 0; c < GRID_SIZE; c++) std::cout << c % 10 << " ";
-    std::cout << "\n\n";
+    NumpyArray d = b + c; // Element-wise addition
+    std::cout << "\nMatrix B + C:\n" << d;
+
+    NumpyArray e = b * b.T(); // Matrix multiplication (2x3 * 3x2 = 2x2)
+    std::cout << "\nMatrix Multiplication (B * B.T):\n" << e;
+
+    // 4. STATISTICAL FUNCTIONS & SLICING
+    std::cout << "\n=== 4. STATISTICAL FUNCTIONS & SLICING ===\n";
+    std::cout << "Max of B overall: " << b.max() << "\n";
+    std::cout << "Sum of B (axis 0 - sum of columns): \n" << b.sum(0);
+    std::cout << "Mean of B (axis 1 - mean of rows): \n" << b.mean(1);
+    
+    std::cout << "Row 1 of B:\n" << b.getRow(1);
+    std::cout << "Slice of B (rows 0-2, cols 1-3):\n" << b.slice(0, 2, 1, 3);
+    
+    std::cout << "Flip B (reverse columns - axis 1):\n" << b.flip(1);
+
+    // 5. POLYMORPHISM
+    std::cout << "\n=== 5. POLYMORPHISM TEST ===\n";
+    DataObject* polyPtr;
+    polyPtr = &b;
+    polyPtr->show(); // Triggers NumpyArray::info() and NumpyArray::display()
+
+    // 6. CPLOT VISUALIZATIONS
+    std::cout << "\n=== 6. CPLOT VISUALIZATIONS ===\n";
+    
+    // 1D Histogram
+    Cplot histData(5);
+    histData(0) = 2; histData(1) = 7; histData(2) = 4; histData(3) = 9; histData(4) = 3;
+    polyPtr = &histData;
+    polyPtr->show(); // Triggers Cplot::info() and Cplot::display() (Histogram)
+
+    // Compare Bar Chart
+    NumpyArray histTarget(5);
+    histTarget(0) = 3; histTarget(1) = 7; histTarget(2) = 2; histTarget(3) = 8; histTarget(4) = 5;
+    histData.compare(histTarget);
+
+    return 0;
 }
